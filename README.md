@@ -1,24 +1,40 @@
-# DuckDB + Shiny for Python — queued aggregations demo
+# DuckDB — queued aggregations demo (Shiny & Streamlit)
 
-Python analogue of an R/Shiny app that runs DuckDB queries via `{mirai}`. The
-mapping:
+Python analogue of an R/Shiny app that runs DuckDB queries via `{mirai}`. Two
+frontends, same behaviour:
 
-| R/Shiny stack        | This demo                                            |
-|----------------------|------------------------------------------------------|
-| Shiny (R)            | **Shiny for Python** (reactive UI, same model)       |
-| duckdb               | **duckdb** (same engine, `.cursor()` per worker)     |
-| mirai daemons        | **`@reactive.extended_task` + `ThreadPoolExecutor`** |
+- **`app.py`** — Shiny for Python
+- **`st-app.py`** — Streamlit
+
+The mapping:
+
+| R/Shiny stack | `app.py` (Shiny)                                     | `st-app.py` (Streamlit)                         |
+|---------------|------------------------------------------------------|-------------------------------------------------|
+| Shiny (R)     | **Shiny for Python** (reactive UI)                   | **Streamlit** (rerun-based UI)                  |
+| duckdb        | **duckdb** — one shared DB, `.cursor()` per worker   | **duckdb** — same, via `@st.cache_resource`     |
+| mirai daemons | **`@reactive.extended_task` + `ThreadPoolExecutor`** | **`Future` + `ThreadPoolExecutor`**, polled by a `st.fragment(run_every=1)` |
 
 Queries run *off* the reactive graph in a shared thread pool. Invocations
-**queue** (a single `ExtendedTask` never runs itself concurrently), and the
-session stays responsive throughout.
+**queue** (`max_workers=3`), and the session stays responsive throughout.
+
+Shiny queues invocations for you (a single `ExtendedTask` never runs itself
+concurrently). Streamlit has no such primitive, so `st-app.py` submits Futures
+to the shared pool and polls them in a 1-second fragment. One honest
+difference: Streamlit shows only the *latest completed* result, whereas Shiny
+auto-renders the in-progress task state.
 
 ## Run
 
 ```bash
+# Shiny
 pip install shiny duckdb pandas matplotlib
 shiny run --reload app.py
 # open http://127.0.0.1:8000
+
+# Streamlit
+pip install streamlit duckdb pandas matplotlib
+streamlit run st-app.py
+# open http://localhost:8501
 ```
 
 ## What to try
